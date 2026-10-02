@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SecureVault — Zero-Knowledge Password Manager</title>
+  <meta name="description" content="Zero-Knowledge password manager with a built-in SOC dashboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+</head>
+<body>
+
+<!-- ════════════════ AUTH SCREEN ════════════════ -->
+<div class="auth-wrap" id="auth-screen">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <div>
+        <h1>SecureVault</h1>
+        <div class="sub">Zero-Knowledge · v3.0</div>
+      </div>
+    </div>
+    <p class="auth-tagline">Your secrets are encrypted in your browser. The server never sees your master password.</p>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-btn-login" data-tab="login">Sign in</button>
+      <button class="tab-btn" id="tab-btn-register" data-tab="register">Create account</button>
+    </div>
+
+    <!-- LOGIN -->
+    <form id="form-login">
+      <div class="field">
+        <label for="login-user">Username</label>
+        <input id="login-user" autocomplete="username" placeholder="your username" />
+      </div>
+      <div class="field">
+        <label for="login-pw">Master password</label>
+        <div class="input-wrap">
+          <input id="login-pw" type="password" autocomplete="current-password" placeholder="••••••••••••" />
+          <button type="button" class="eye" data-toggle="login-pw" aria-label="Show password"></button>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="login-btn">Unlock vault</button>
+    </form>
+
+    <!-- REGISTER -->
+    <form id="form-register" class="hidden">
+      <div class="field">
+        <label for="reg-user">Username</label>
+        <input id="reg-user" autocomplete="username" placeholder="3–32 chars: letters, digits, _ -" />
+      </div>
+      <div class="field">
+        <label for="reg-pw">Master password</label>
+        <div class="input-wrap">
+          <input id="reg-pw" type="password" autocomplete="new-password" placeholder="at least 12 characters" />
+          <button type="button" class="eye" data-toggle="reg-pw" aria-label="Show password"></button>
+        </div>
+        <div class="strength"><div id="reg-strength-bar"></div></div>
+        <div class="strength-label" id="reg-strength-label"></div>
+      </div>
+      <div class="field">
+        <label for="reg-pw2">Confirm master password</label>
+        <input id="reg-pw2" type="password" autocomplete="new-password" placeholder="repeat your master password" />
+      </div>
+      <div class="field">
+        <label for="reg-kdf">Key derivation (KDF)</label>
+        <select id="reg-kdf">
+          <option value="pbkdf2">PBKDF2-SHA256 · 600 000 iterations (native)</option>
+          <option value="argon2">Argon2id · 64 MB (if WASM module loaded)</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="reg-btn">Create encrypted vault</button>
+    </form>
+
+    <div class="auth-msg" id="auth-msg"></div>
+
+    <div class="zk-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/></svg>
+      <span><strong>Zero-Knowledge:</strong> keys are derived locally; only a SHA-256 authentication proof leaves your device. Lose your master password and your vault is unrecoverable — by design.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ APP SHELL ════════════════ -->
+<div class="app" id="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <div><h1>SecureVault</h1><div class="sub">SOC Console</div></div>
+    </div>
+
+    <div class="nav-label">Overview</div>
+    <button class="nav-item active" data-page="dashboard">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" data-page="vault">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Vault <span class="nav-badge hidden" id="vault-count">0</span>
+    </button>
+    <button class="nav-item" data-page="generator">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>
+      Generator
+    </button>
+
+    <div class="nav-label">Security Operations</div>
+    <button class="nav-item" data-page="alerts">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M10.3 3.9a2 2 0 0 1 3.4 0l8 14A2 2 0 0 1 20 21H4a2 2 0 0 1-1.7-3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Alerts <span class="nav-badge danger hidden" id="alert-count">0</span>
+    </button>
+    <button class="nav-item" data-page="monitoring">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Monitoring
+    </button>
+
+    <div class="sidebar-bottom">
+      <div class="user-chip">
+        <div class="avatar" id="user-avatar">U</div>
+        <div class="grow">
+          <div class="feed-main"><div class="t" id="user-name">user</div><div class="d">Encrypted session</div></div>
+        </div>
+      </div>
+      <button class="nav-item" id="logout-btn">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div class="flex center gap-12">
+        <button class="icon-btn hamburger" id="hamburger" aria-label="Menu">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+          <div class="page-title" id="topbar-title">Dashboard</div>
+          <div class="page-sub" id="topbar-sub">Security overview of your vault</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="search-box hidden" id="global-search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="global-search" placeholder="Search…" />
+        </div>
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon" viewBox="0 0 24 24" id="theme-icon"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ DASHBOARD ══ -->
+    <section class="page active" id="page-dashboard">
+      <div class="grid stats-grid" id="stat-cards"></div>
+
+      <div class="grid cols-2" id="dash-mid">
+        <div class="card">
+          <div class="card-title">Security events — last 7 days</div>
+          <div class="chart-wrap" id="chart-events"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Session risk score</div>
+          <div class="gauge">
+            <div class="gauge-ring" id="chart-risk"></div>
+            <div class="gauge-info">
+              <div class="lvl" id="risk-level">—</div>
+              <div class="desc" id="risk-desc">Computed from access patterns</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid cols-2">
+        <div class="card">
+          <div class="card-title">Recent activity</div>
+          <div class="feed" id="activity-feed"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Alert severity</div>
+          <div class="chart-wrap" id="chart-alerts"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ VAULT ══ -->
+    <section class="page" id="page-vault">
+      <div class="toolbar">
+        <button class="btn btn-primary" id="add-entry-btn">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New entry
+        </button>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="vault-search" placeholder="Search entries…" />
+        </div>
+        <div class="flex gap-8 grow" id="cat-chips"></div>
+      </div>
+      <div class="grid entries-grid" id="entries"></div>
+    </section>
+
+    <!-- ══ GENERATOR ══ -->
+    <section class="page" id="page-generator">
+      <div class="grid cols-2e">
+        <div class="card">
+          <div class="card-title">Password generator</div>
+          <div class="tabs">
+            <button class="tab-btn active" data-gen="random">Random</button>
+            <button class="tab-btn" data-gen="memorable">Memorable</button>
+            <button class="tab-btn" data-gen="ai">AI suggest</button>
+          </div>
+
+          <div class="gen-output">
+            <span class="pw" id="gen-out">click generate</span>
+            <button class="icon-btn" id="gen-copy" aria-label="Copy">
+              <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+            <button class="icon-btn" id="gen-refresh" aria-label="Regenerate">
+              <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
+          <div class="strength"><div id="gen-strength-bar"></div></div>
+          <div class="strength-label" id="gen-strength-label"></div>
+
+          <div id="gen-random-opts">
+            <div class="range-row">
+              <label for="gen-length">Length</label>
+              <input type="range" id="gen-length" min="8" max="64" value="20" />
+              <span class="range-val" id="gen-length-val">20</span>
+            </div>
+            <div class="switch-row"><span>Uppercase (A-Z)</span><label class="switch"><input type="checkbox" id="gen-upper" checked /><span class="track"></span></label></div>
+            <div class="switch-row"><span>Digits (0-9)</span><label class="switch"><input type="checkbox" id="gen-digits" checked /><span class="track"></span></label></div>
+            <div class="switch-row"><span>Symbols (!@#…)</span><label class="switch"><input type="checkbox" id="gen-symbols" checked /><span class="track"></span></label></div>
+          </div>
+          <div id="gen-context-opts" class="hidden">
+            <div class="field">
+              <label for="gen-site">Site hint (optional)</label>
+              <input id="gen-site" placeholder="e.g. github, banking…" />
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" id="gen-generate">Generate</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Breach check (HaveIBeenPwned)</div>
+          <p class="muted">Check whether a password has appeared in known breaches. Only a 5-character SHA-1 prefix leaves your device (k-anonymity).</p>
+          <div class="field" id="hibp-field">
+            <label for="hibp-input">Password to check</label>
+            <div class="input-wrap">
+              <input id="hibp-input" type="password" placeholder="enter a password" />
+              <button type="button" class="eye" data-toggle="hibp-input" aria-label="Show"></button>
+            </div>
+          </div>
+          <button class="btn btn-block" id="hibp-btn">Check for breaches</button>
+          <div id="hibp-result" class="auth-msg"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ ALERTS ══ -->
+    <section class="page" id="page-alerts">
+      <div class="toolbar">
+        <div class="flex gap-8" id="alert-sev-chips">
+          <button class="chip active" data-sev="all">All severities</button>
+          <button class="chip" data-sev="crit">Critical</button>
+          <button class="chip" data-sev="high">High</button>
+          <button class="chip" data-sev="medium">Medium</button>
+          <button class="chip" data-sev="low">Low</button>
+        </div>
+        <select class="select-sm" id="alert-status-filter">
+          <option value="all">All statuses</option>
+          <option value="open">Open</option>
+          <option value="progress">In progress</option>
+          <option value="resolved">Resolved</option>
+        </select>
+        <div class="search-box grow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="alert-search" placeholder="Search alerts…" />
+        </div>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Severity</th><th>Alert</th><th>Detail</th><th>Time</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="alerts-body"></tbody>
+          </table>
+        </div>
+        <div id="alerts-empty"></div>
+      </div>
+    </section>
+
+    <!-- ══ MONITORING ══ -->
+    <section class="page" id="page-monitoring">
+      <div class="grid cols-2">
+        <div class="card">
+          <div class="card-title">System event journal</div>
+          <div class="toolbar">
+            <select class="select-sm" id="mon-type-filter"><option value="all">All event types</option></select>
+            <div class="search-box grow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="mon-search" placeholder="Filter log…" />
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>Type</th><th>Detail</th><th>IP (hashed)</th><th>Risk</th><th>Time</th></tr></thead>
+              <tbody id="mon-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title">Last connections</div>
+            <div class="feed" id="last-logins"></div>
+          </div>
+          <div class="card" id="ai-anomaly-card">
+            <div class="card-title">AI anomaly detection</div>
+            <p class="muted">Behavioural model (Isolation Forest) over your login patterns.</p>
+            <button class="btn btn-block" id="ai-anomaly-btn">Analyze current session</button>
+            <div id="ai-anomaly-result" class="auth-msg"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ════════════════ ENTRY MODAL ════════════════ -->
+<div class="modal" id="entry-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="entry-modal-title">New entry</h3>
+      <button class="icon-btn" data-close="entry-modal" aria-label="Close">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label for="e-title">Title *</label><input id="e-title" placeholder="e.g. GitHub" /></div>
+      <div class="field"><label for="e-username">Username / email</label><input id="e-username" autocomplete="off" /></div>
+      <div class="field">
+        <label for="e-password">Password</label>
+        <div class="input-wrap">
+          <input id="e-password" type="password" autocomplete="off" />
+          <button type="button" class="eye" data-toggle="e-password" aria-label="Show"></button>
+        </div>
+        <div class="strength"><div id="e-strength-bar"></div></div>
+        <div class="strength-label" id="e-strength-label"></div>
+        <button class="btn btn-sm btn-ghost" id="e-gen-btn" type="button">Generate strong password</button>
+      </div>
+      <div class="field"><label for="e-url">URL</label><input id="e-url" placeholder="https://…" /></div>
+      <div class="field"><label for="e-category">Category</label>
+        <select id="e-category">
+          <option>General</option><option>Social</option><option>Finance</option>
+          <option>Work</option><option>Email</option><option>Shopping</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label for="e-notes">Notes</label><textarea id="e-notes" rows="3"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close="entry-modal">Cancel</button>
+      <button class="btn btn-primary" id="entry-save-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ DETAIL MODAL ════════════════ -->
+<div class="modal" id="detail-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="detail-title">Entry</h3>
+      <button class="icon-btn" data-close="detail-modal" aria-label="Close">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="detail-delete">Delete</button>
+      <button class="btn" id="detail-edit">Edit</button>
+    </div>
+  </div>
+</div>
+
+<div class="loader-overlay" id="loader">
+  <div class="loader-box"><div class="spinner"></div><div class="txt" id="loader-txt">Deriving keys…</div></div>
+</div>
+<div class="toasts" id="toasts"></div>
+
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/crypto.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

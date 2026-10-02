@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>500 — Server Error · SecureVault</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+</head>
+<body>
+  <div class="err-wrap">
+    <div>
+      <div class="brand jc-center">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+      </div>
+      <div class="err-code">500</div>
+      <div class="err-msg">Something went wrong</div>
+      <div class="err-sub">An internal error occurred. Your encrypted data is safe.</div>
+      <a class="btn btn-primary" href="/">Back to SecureVault</a>
+    </div>
+  </div>
+</body>
+</html>

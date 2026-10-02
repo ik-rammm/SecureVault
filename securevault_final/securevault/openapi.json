@@ -1,0 +1,78 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SecureVault API",
+    "version": "3.0.0",
+    "description": "Zero-Knowledge password manager API. The server never receives the master password, K_enc, or plaintext entries; it stores opaque AES-256-GCM blobs and verifies a SHA-256 authentication proof. JWTs are signed with RS256."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT (RS256)" }
+    }
+  },
+  "paths": {
+    "/auth/salt": {
+      "get": {
+        "summary": "Get the public salt + KDF for a username (anti-enumeration: returns a deterministic pseudo-salt for unknown users).",
+        "parameters": [{ "name": "username", "in": "query", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Salt and KDF" } }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "Create a zero-knowledge account. All crypto is computed client-side.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object",
+            "required": ["username", "salt_hex", "auth_hash", "kdf", "blob"],
+            "properties": {
+              "username": { "type": "string" },
+              "salt_hex": { "type": "string", "description": "64 hex chars (32-byte public salt)" },
+              "auth_hash": { "type": "string", "description": "SHA-256(K_auth), 64 hex chars" },
+              "kdf": { "type": "string", "enum": ["pbkdf2", "argon2"] },
+              "blob": { "type": "string", "description": "Initial AES-256-GCM vault (base64)" }
+            }
+          } } }
+        },
+        "responses": { "201": { "description": "Created" }, "409": { "description": "Username taken" }, "422": { "description": "Validation error" } }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Authenticate with the SHA-256 proof (constant-time compare). Returns a JWT RS256.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object",
+            "required": ["username", "auth_hash"],
+            "properties": { "username": { "type": "string" }, "auth_hash": { "type": "string" } }
+          } } }
+        },
+        "responses": { "200": { "description": "JWT issued" }, "401": { "description": "Invalid credentials" } }
+      }
+    },
+    "/auth/refresh": { "post": { "summary": "Rotate the JWT (blacklists the old one).", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "New token" } } } },
+    "/auth/logout": { "post": { "summary": "Invalidate the current JWT.", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Logged out" } } } },
+    "/vault/blob": {
+      "get": { "summary": "Download the opaque encrypted vault blob.", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Blob" }, "404": { "description": "Vault not found" } } },
+      "put": {
+        "summary": "Store a new opaque encrypted vault blob (client re-encrypts before upload).",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["blob"], "properties": { "blob": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Saved" }, "422": { "description": "Validation error" } }
+      }
+    },
+    "/security/strength": { "post": { "summary": "AI/heuristic strength score for a candidate password.", "responses": { "200": { "description": "Score" } } } },
+    "/security/hibp": { "post": { "summary": "HaveIBeenPwned check (k-anonymity).", "responses": { "200": { "description": "Result" }, "503": { "description": "HIBP unavailable" } } } },
+    "/security/audit": { "get": { "summary": "Security event journal (JournalAudit).", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Log" } } } },
+    "/security/alerts": { "get": { "summary": "Session risk score + recent events + last logins.", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Alerts" } } } },
+    "/ai/anomaly": { "post": { "summary": "Login anomaly detection (Isolation Forest).", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Verdict" } } } },
+    "/ai/suggest": { "post": { "summary": "Contextual memorable password suggestion.", "responses": { "200": { "description": "Suggestion" } } } },
+    "/ai/alternatives": { "post": { "summary": "Stronger alternatives for a weak password.", "responses": { "200": { "description": "Alternatives" } } } },
+    "/generate": { "post": { "summary": "Generate a random password (server helper).", "responses": { "200": { "description": "Password" } } } },
+    "/generate/memorable": { "post": { "summary": "Generate a memorable passphrase.", "responses": { "200": { "description": "Passphrase" } } } },
+    "/health": { "get": { "summary": "System status probe.", "responses": { "200": { "description": "OK" } } } }
+  }
+}

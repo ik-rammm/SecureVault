@@ -1,0 +1,54 @@
+# SecureVault .gitignore
+
+# Environment / secrets — NEVER commit these
+.env
+*.key
+*.pem
+*.crt
+nginx/certs/
+
+# Vault data (user data — never commit)
+securevault/data/
+data/
+
+# Auto-generated RS256 keys (never commit)
+securevault/keys/
+keys/
+
+# Persisted ML models
+securevault/models/*.pkl
+securevault/models/*.joblib
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+security.log
+
+# Benchmark outputs
+benchmark_results.json
